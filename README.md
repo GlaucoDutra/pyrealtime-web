@@ -10,7 +10,7 @@ A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyre
 - Structured Realtime function-call handling
 - Secure forwarding of application tools to `POST /v1/tools/{tool_name}`
 - Local `get_available_animations` and `play_avatar_animation` tools
-- Chat attachments with image compression and text extraction
+- Chat attachments prepared by the reusable PyRealtime file API
 - A smooth antialiased Three.js avatar canvas with optional GLB loading
 - A procedural fallback avatar, embedded gestures, and audio-reactive animation
 - Session-only access-token storage
@@ -29,10 +29,13 @@ PyRealtime API
   ├─ keeps OPENAI_API_KEY on the server
   ├─ creates the OpenAI Realtime call
   ├─ authenticates the application user
+  ├─ validates, extracts, normalizes, and chunks attachments
   └─ executes registered backend tools
 ```
 
 Avatar tools execute locally because the avatar exists in the browser. Every other function call is forwarded to the PyRealtime backend. Function results are returned to the model as `function_call_output` events.
+
+The reusable boundary is documented in [ARCHITECTURE.md](ARCHITECTURE.md): processing and policy belong to PyRealtime; browser UI, devices, rendering, and Realtime event dispatch belong here.
 
 `play_avatar_animation` deliberately does not create a second model response. This prevents unwanted narration such as “the animation was completed.” The frontend also filters common textual imitations of animation calls from the visible transcript as a defensive fallback.
 
@@ -86,15 +89,15 @@ Remote URLs are loaded directly by the browser and therefore require CORS permis
 
 ## Chat attachments
 
-The chat composer accepts one attachment at a time and follows the same processing structure as the original plugin:
+The chat composer accepts one attachment at a time. It uploads the raw file to authenticated `POST /v1/files/prepare`; PyRealtime returns a normalized, transport-neutral result:
 
-- PNG, JPEG, GIF, and WebP images are resized and compressed before being sent as `input_image` content.
-- TXT, Markdown, CSV, JSON, JavaScript, TypeScript, HTML, CSS, and XML are decoded in the browser.
+- Common images are resized and compressed before the frontend sends them as `input_image` content.
+- Text, source, and structured-text formats are decoded and chunked.
 - PDFs are parsed page-by-page for selectable text.
-- XLSX and XLSM spreadsheets are converted to tab-separated text.
-- Legacy spreadsheets, Word files, PowerPoint files, and unknown formats send a preprocessing notice instead of pretending their contents were read.
+- XLSX/XLSM, DOCX, and PPTX files have their text extracted server-side.
+- Unsupported formats return an honest conversion notice instead of pretending their contents were read.
 
-Extracted text is capped at 120,000 characters, split into 8,000-character conversation items, and sent with data-channel backpressure. Files are limited to 25 MB. File contents stay in the browser and Realtime session; they are not stored by the PyRealtime backend.
+Extracted text is capped at 120,000 characters, split into 8,000-character conversation items, and sent with data-channel backpressure. Files are limited to 25 MB. The example processor is stateless: it handles uploads in memory and does not persist them.
 
 On desktop, the application shell remains fixed to the viewport and only the conversation history scrolls. Mobile layouts retain normal page scrolling while keeping the conversation history independently scrollable.
 
@@ -111,7 +114,7 @@ APP_CORS_ORIGINS=http://127.0.0.1:5173
 Run the example backend from the PyRealtime repository:
 
 ```bash
-python -m pip install -e ".[api]"
+python -m pip install -e ".[api,files]"
 uvicorn examples.api_server:app --reload
 ```
 

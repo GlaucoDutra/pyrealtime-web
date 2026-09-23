@@ -1,5 +1,5 @@
 import type { BackendClient } from "./backend-client";
-import { MAX_DATA_CHANNEL_BYTES, prepareAttachment, splitText } from "./file-processing";
+import { MAX_DATA_CHANNEL_BYTES } from "./file-processing";
 import { ToolCallAccumulator, type CompletedToolCall } from "./tool-call-accumulator";
 import { mergeToolSchemas, type ToolRouter } from "./tool-router";
 
@@ -155,9 +155,10 @@ export class RealtimeClient {
 
   async sendFile(file: File, caption: string, onProgress?: (message: string) => void): Promise<void> {
     const instruction = caption.trim() || "Please analyze this file.";
-    const attachment = await prepareAttachment(file, onProgress);
+    const attachment = await this.backend.prepareFile(file, this.abortController?.signal, onProgress);
 
     if (attachment.kind === "image") {
+      if (!attachment.data_url) throw new Error("PyRealtime returned no prepared image content");
       onProgress?.("Sending image…");
       await this.sendSafely({
         type: "conversation.item.create",
@@ -166,7 +167,7 @@ export class RealtimeClient {
           role: "user",
           content: [
             { type: "input_text", text: instruction },
-            { type: "input_image", image_url: attachment.dataUrl },
+            { type: "input_image", image_url: attachment.data_url },
           ],
         },
       });
@@ -175,7 +176,9 @@ export class RealtimeClient {
     }
 
     if (attachment.kind === "text") {
-      const { chunks, truncated } = splitText(attachment.text);
+      const chunks = attachment.chunks ?? [];
+      const truncated = attachment.truncated ?? false;
+      if (!chunks.length) throw new Error("PyRealtime returned no extracted file content");
       onProgress?.(`Sending ${chunks.length} file chunk${chunks.length === 1 ? "" : "s"}…`);
       await this.sendSafely({
         type: "conversation.item.create",
@@ -186,8 +189,8 @@ export class RealtimeClient {
             type: "input_text",
             text: [
               "The user attached a file for analysis.",
-              `File name: ${attachment.fileName}`,
-              `File type: ${attachment.extension || "unknown"}`,
+              `File name: ${attachment.filename}`,
+              `File type: ${attachment.media_type || "unknown"}`,
               `User instruction: ${instruction}`,
               `The content follows in ${chunks.length} chunks. Do not answer until [END OF FILE].`,
             ].join("\n"),
@@ -230,10 +233,10 @@ export class RealtimeClient {
           type: "input_text",
           text: [
             "The user attached a file that cannot be parsed directly in this Realtime session.",
-            `File name: ${attachment.fileName}`,
-            `File type: ${attachment.extension || "unknown"}`,
+            `File name: ${attachment.filename}`,
+            `File type: ${attachment.media_type || "unknown"}`,
             `User instruction: ${instruction}`,
-            attachment.text,
+            attachment.message || "This file type could not be prepared.",
           ].join("\n"),
         }],
       },

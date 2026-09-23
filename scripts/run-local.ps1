@@ -96,7 +96,7 @@ if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
 }
 
 Write-Host "Installing the local backend..." -ForegroundColor Cyan
-& $venvPython -m pip install --disable-pip-version-check --quiet -e "$resolvedBackendPath[api]"
+& $venvPython -m pip install --disable-pip-version-check --quiet -e "$resolvedBackendPath[api,files]"
 if ($LASTEXITCODE -ne 0) { throw "Backend installation failed." }
 
 if (-not (Test-Path -LiteralPath (Join-Path $frontendPath "node_modules") -PathType Container)) {
