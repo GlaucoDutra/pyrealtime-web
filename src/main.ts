@@ -10,8 +10,9 @@ import {
 import { BackendClient } from "./backend-client";
 import { loadConfig, saveConfig, type AppConfig } from "./config";
 import { formatFileSize } from "./file-processing";
-import { RealtimeClient, type ConnectionState } from "./realtime-client";
+import { RealtimeClient, type ConnectionState, type ToolActivityEvent } from "./realtime-client";
 import { ToolRouter } from "./tool-router";
+import { toolFeedback } from "./tool-feedback";
 import { sanitizeAssistantTranscript } from "./transcript";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -59,6 +60,7 @@ let streamingAssistantMessage: HTMLElement | null = null;
 let hasSavedAvatar = false;
 let pendingFile: File | null = null;
 let sendingFile = false;
+const toolActivities = new Map<string, { article: HTMLElement; timers: number[] }>();
 
 function updateStatus(state: ConnectionState, label: string): void {
   statusPill.dataset.state = state;
@@ -108,6 +110,36 @@ function addGeneratedImage(dataUrl: string, description: string): void {
   scrollMessages();
 }
 
+function updateToolActivity(event: ToolActivityEvent): void {
+  if (event.state === "running") {
+    const article = addMessage("tool", toolFeedback(event.name, "starting"));
+    article.dataset.state = "running";
+    const paragraph = article.querySelector("p");
+    const timers = [
+      window.setTimeout(() => {
+        if (paragraph) paragraph.textContent = toolFeedback(event.name, "working");
+      }, 7_000),
+      window.setTimeout(() => {
+        if (paragraph) paragraph.textContent = toolFeedback(event.name, "delayed");
+      }, 20_000),
+    ];
+    toolActivities.set(event.callId, { article, timers });
+    return;
+  }
+
+  const activity = toolActivities.get(event.callId);
+  if (!activity) return;
+  activity.timers.forEach((timer) => window.clearTimeout(timer));
+  const paragraph = activity.article.querySelector("p");
+  activity.article.dataset.state = event.state;
+  if (paragraph) paragraph.textContent = toolFeedback(event.name, event.state, event.error);
+  toolActivities.delete(event.callId);
+  if (event.state === "complete") {
+    window.setTimeout(() => activity.article.remove(), 4_000);
+  }
+  scrollMessages();
+}
+
 function setPendingFile(file: File | null): void {
   pendingFile = file;
   attachmentPreview.hidden = file === null;
@@ -137,10 +169,7 @@ function createClient(): RealtimeClient {
     onStatus: updateStatus,
     onTranscript: updateTranscript,
     onRemoteStream: (stream) => avatar.attachAudioStream(stream),
-    onTool: (name, state) => {
-      if (state === "running") addMessage("tool", `Running ${name}`);
-      if (state === "error") addMessage("system", `${name} could not be completed.`);
-    },
+    onTool: updateToolActivity,
     onError: (error) => addMessage("system", error.message),
   });
 }

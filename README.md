@@ -9,6 +9,7 @@ A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyre
 - Text and microphone input
 - Persistent microphone selection with live device switching
 - Structured Realtime function-call handling
+- Progressive tool feedback for searches, file lookup, and image generation
 - Secure forwarding of application tools to `POST /v1/tools/{tool_name}`
 - Local navigation, `get_available_animations`, and `play_avatar_animation` tools
 - Server-side web search, file search, private model calls, and image generation

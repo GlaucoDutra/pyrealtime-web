@@ -5,10 +5,17 @@ import { mergeToolSchemas, type ToolRouter } from "./tool-router";
 
 export type ConnectionState = "idle" | "connecting" | "connected" | "error";
 
+export interface ToolActivityEvent {
+  callId: string;
+  name: string;
+  state: "running" | "complete" | "error";
+  error?: string;
+}
+
 export interface RealtimeClientEvents {
   onStatus?: (state: ConnectionState, label: string) => void;
   onTranscript?: (role: "user" | "assistant", text: string, final: boolean) => void;
-  onTool?: (name: string, state: "running" | "complete" | "error") => void;
+  onTool?: (event: ToolActivityEvent) => void;
   onRemoteStream?: (stream: MediaStream) => void;
   onError?: (error: Error) => void;
 }
@@ -370,7 +377,7 @@ export class RealtimeClient {
   }
 
   private async executeTool(call: CompletedToolCall): Promise<void> {
-    this.events.onTool?.(call.name, "running");
+    this.events.onTool?.({ callId: call.callId, name: call.name, state: "running" });
     try {
       const result = await this.tools.execute(call.name, call.arguments);
       this.send({
@@ -381,7 +388,7 @@ export class RealtimeClient {
           output: stringifyOutput(result.output),
         },
       });
-      this.events.onTool?.(call.name, "complete");
+      this.events.onTool?.({ callId: call.callId, name: call.name, state: "complete" });
       if (result.continueResponse) {
         this.send({
           type: "response.create",
@@ -400,10 +407,12 @@ export class RealtimeClient {
           output: JSON.stringify({ ok: false, error: detail }),
         },
       });
-      this.events.onTool?.(call.name, "error");
+      this.events.onTool?.({ callId: call.callId, name: call.name, state: "error", error: detail });
       this.send({
         type: "response.create",
-        response: { instructions: "Continue helpfully without exposing tool internals." },
+        response: {
+          instructions: "Briefly explain that the requested action could not be completed. Do not retry the same failed tool unless the user explicitly asks you to try again. Do not expose tool internals.",
+        },
       });
     }
   }

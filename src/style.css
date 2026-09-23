@@ -236,6 +236,19 @@ h2 { font-size: 25px; }
 .message-system { width: 100%; color: var(--muted); }
 .message-system p { border-style: dashed; background: transparent; }
 .message-tool p { color: #a7e9f7; background: rgba(18, 73, 86, 0.3); }
+.message-tool[data-state="running"] p::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgba(99, 230, 255, 0.8);
+  content: "";
+  animation: tool-pulse 1.2s ease-in-out infinite;
+}
+.message-tool[data-state="error"] p { color: #ffb5bd; border-color: rgba(255, 105, 120, 0.35); }
+@keyframes tool-pulse { 50% { opacity: 0.3; transform: scale(0.72); } }
 .message-role { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 
 .composer {
