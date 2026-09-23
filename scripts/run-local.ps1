@@ -64,6 +64,7 @@ function Stop-OwnedListener([int]$Port, [string[]]$ExpectedCommandParts) {
             }
         }
         if ($isOwned) {
+            Write-Host "Stopping the previous local service on port $Port..." -ForegroundColor Yellow
             & taskkill.exe /PID $connection.OwningProcess /T /F *> $null
         }
         else {
@@ -72,8 +73,16 @@ function Stop-OwnedListener([int]$Port, [string[]]$ExpectedCommandParts) {
     }
 }
 
-if (-not (Test-PortAvailable $BackendPort)) { throw "Port $BackendPort is already in use." }
-if (-not (Test-PortAvailable $FrontendPort)) { throw "Port $FrontendPort is already in use." }
+if (-not (Test-PortAvailable $BackendPort)) {
+    Stop-OwnedListener $BackendPort @($frontendPath, $resolvedBackendPath, "examples.prototype_server:app")
+    Start-Sleep -Milliseconds 300
+}
+if (-not (Test-PortAvailable $FrontendPort)) {
+    Stop-OwnedListener $FrontendPort @($frontendPath, "vite.js")
+    Start-Sleep -Milliseconds 300
+}
+if (-not (Test-PortAvailable $BackendPort)) { throw "Port $BackendPort is used by another application." }
+if (-not (Test-PortAvailable $FrontendPort)) { throw "Port $FrontendPort is used by another application." }
 
 if ([string]::IsNullOrWhiteSpace($env:OPENAI_API_KEY)) {
     Write-Host "Enter your OpenAI API key. It will remain only in these local process environments." -ForegroundColor Cyan
