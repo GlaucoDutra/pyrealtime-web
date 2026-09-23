@@ -125,7 +125,7 @@ cancelSettings.addEventListener("click", () => settingsDialog.close());
 clearButton.addEventListener("click", () => {
   messages.replaceChildren();
   streamingAssistantMessage = null;
-  addMessage("system", client?.connected ? "Conversation display cleared." : "Configure your PyRealtime API, then connect to begin.");
+  addMessage("system", client?.connected ? "Conversation display cleared." : "Start the PyRealtime API, then connect to begin.");
 });
 
 settingsForm.addEventListener("submit", (event) => {
@@ -174,5 +174,3 @@ micButton.addEventListener("click", () => {
 window.addEventListener("beforeunload", () => void client?.disconnect());
 void avatar.load(config.avatarUrl).catch(() => avatar.load(""));
 updateStatus("idle", "Ready");
-
-if (!localStorage.getItem("pyrealtime-web-config")) openSettings();

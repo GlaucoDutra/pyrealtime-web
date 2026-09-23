@@ -43,6 +43,20 @@ Avatar tools execute locally because the avatar exists in the browser. Every oth
 
 ## Run locally
 
+### One-click Windows prototype
+
+Clone `pyrealtime` and `pyrealtime-web` as sibling directories, then double-click `run-local.cmd` or run:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+The launcher securely prompts for `OPENAI_API_KEY`, creates an isolated Python environment, starts both services on `127.0.0.1`, and opens the frontend. The key remains only in the local backend process environment. Press Enter in the launcher window to stop both services.
+
+The prototype includes backend tools for local time, exact arithmetic, remembering notes, and listing notes, plus local avatar animation tools.
+
+### Manual development
+
 ```bash
 npm install
 npm run dev
