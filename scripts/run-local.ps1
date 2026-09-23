@@ -140,6 +140,17 @@ try {
         -WorkingDirectory $resolvedBackendPath -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr
     Wait-Http "http://127.0.0.1:$BackendPort/v1/health" $backendProcess $backendErr
+    try {
+        Invoke-RestMethod -Uri "http://127.0.0.1:$BackendPort/v1/realtime/token" -Method Post -TimeoutSec 30 | Out-Null
+    }
+    catch {
+        $detail = $_.ErrorDetails.Message
+        if ($detail) {
+            try { $detail = (ConvertFrom-Json $detail).detail } catch { }
+        }
+        if (-not $detail) { $detail = $_.Exception.Message }
+        throw "OpenAI connection check failed: $detail"
+    }
 
     Write-Host "Starting the frontend on http://127.0.0.1:$FrontendPort ..." -ForegroundColor Cyan
     $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
