@@ -47,16 +47,30 @@ describe("ToolRouter", () => {
   });
 
   it("handles safe navigation in the browser", async () => {
-    const open = vi.fn().mockReturnValue({});
+    const opened = { opener: {} };
+    const open = vi.fn().mockReturnValue(opened);
     vi.stubGlobal("window", { open });
     const router = new ToolRouter({ callTool: vi.fn() } as never, {
       availableAnimations: () => [],
       playAnimation: vi.fn(),
     });
 
-    await router.execute("navigate_to_url", { url: "https://example.com/path", new_tab: true });
+    const result = await router.execute("navigate_to_url", { url: "https://example.com/path", new_tab: true });
 
-    expect(open).toHaveBeenCalledWith("https://example.com/path", "_blank", "noopener,noreferrer");
+    expect(open).toHaveBeenCalledWith("https://example.com/path", "_blank");
+    expect(opened.opener).toBeNull();
+    expect(result.continueResponse).toBe(false);
+  });
+
+  it("reports a genuinely blocked new tab", async () => {
+    vi.stubGlobal("window", { open: vi.fn().mockReturnValue(null) });
+    const router = new ToolRouter({ callTool: vi.fn() } as never, {
+      availableAnimations: () => [],
+      playAnimation: vi.fn(),
+    });
+
+    await expect(router.execute("navigate_to_url", { url: "https://example.com", new_tab: true }))
+      .rejects.toThrow("browser blocked");
   });
 });
 

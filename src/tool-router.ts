@@ -75,9 +75,15 @@ export class ToolRouter {
       const url = new URL(rawUrl);
       if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed");
       const newTab = argumentsValue.new_tab !== false;
-      const opened = window.open(url.toString(), newTab ? "_blank" : "_self", newTab ? "noopener,noreferrer" : undefined);
+      // Passing `noopener` as a window feature makes some browsers return null
+      // even when the tab opened successfully. Open first, then sever the
+      // opener synchronously so null remains a reliable popup-block signal.
+      const opened = window.open(url.toString(), newTab ? "_blank" : "_self");
       if (!opened && newTab) throw new Error("The browser blocked the new tab");
-      return { output: { ok: true, url: url.toString() }, continueResponse: true };
+      if (newTab && opened) opened.opener = null;
+      // Navigation is already the requested visible action. A follow-up model
+      // response adds redundant narration and can falsely reinterpret success.
+      return { output: { ok: true, url: url.toString() }, continueResponse: false };
     }
 
     if (name === "get_available_animations") {
