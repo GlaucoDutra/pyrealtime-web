@@ -1,5 +1,12 @@
 import "./style.css";
 import { AvatarStage } from "./avatar-stage";
+import {
+  getSavedAvatar,
+  removeSavedAvatar,
+  saveAvatarFile,
+  validateAvatarFile,
+  withAvatarObjectUrl,
+} from "./avatar-storage";
 import { BackendClient } from "./backend-client";
 import { loadConfig, saveConfig, type AppConfig } from "./config";
 import { RealtimeClient, type ConnectionState } from "./realtime-client";
@@ -29,6 +36,11 @@ const settingsForm = element<HTMLFormElement>("settings-form");
 const apiUrlInput = element<HTMLInputElement>("api-url-input");
 const accessTokenInput = element<HTMLInputElement>("access-token-input");
 const avatarUrlInput = element<HTMLInputElement>("avatar-url-input");
+const avatarFileInput = element<HTMLInputElement>("avatar-file-input");
+const avatarFileStatus = element<HTMLElement>("avatar-file-status");
+const settingsError = element<HTMLParagraphElement>("settings-error");
+const saveSettings = element<HTMLButtonElement>("save-settings");
+const clearAvatar = element<HTMLButtonElement>("clear-avatar");
 const cancelSettings = element<HTMLButtonElement>("cancel-settings");
 
 const avatar = new AvatarStage(canvas);
@@ -36,6 +48,7 @@ let config = loadConfig();
 let client: RealtimeClient | null = null;
 let muted = false;
 let streamingAssistantMessage: HTMLElement | null = null;
+let hasSavedAvatar = false;
 
 function updateStatus(state: ConnectionState, label: string): void {
   statusPill.dataset.state = state;
@@ -112,16 +125,52 @@ async function connect(): Promise<void> {
   }
 }
 
+function formatBytes(value: number): string {
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function showSettingsError(error: unknown): void {
+  settingsError.textContent = error instanceof Error ? error.message : String(error);
+  settingsError.hidden = false;
+}
+
+async function refreshAvatarFileStatus(): Promise<void> {
+  const stored = await getSavedAvatar();
+  hasSavedAvatar = stored !== null;
+  avatarFileStatus.textContent = stored
+    ? `Saved: ${stored.name} (${formatBytes(stored.size)}). Choose another file to replace it.`
+    : "Stored only in this browser. Maximum size: 50 MB.";
+  clearAvatar.hidden = !stored;
+}
+
 function openSettings(): void {
   apiUrlInput.value = config.apiUrl;
   accessTokenInput.value = config.accessToken;
   avatarUrlInput.value = config.avatarUrl;
+  avatarFileInput.value = "";
+  settingsError.hidden = true;
   settingsDialog.showModal();
+  void refreshAvatarFileStatus().catch(showSettingsError);
 }
 
 connectButton.addEventListener("click", () => void connect());
 settingsButton.addEventListener("click", openSettings);
 cancelSettings.addEventListener("click", () => settingsDialog.close());
+clearAvatar.addEventListener("click", () => {
+  void (async () => {
+    try {
+      await removeSavedAvatar();
+      config = saveConfig({ ...config, avatarUrl: "" });
+      avatarUrlInput.value = "";
+      await avatar.load("");
+      await refreshAvatarFileStatus();
+      addMessage("system", "Saved avatar removed. Using the built-in avatar.");
+    } catch (error) {
+      showSettingsError(error);
+    }
+  })();
+});
 clearButton.addEventListener("click", () => {
   messages.replaceChildren();
   streamingAssistantMessage = null;
@@ -130,17 +179,51 @@ clearButton.addEventListener("click", () => {
 
 settingsForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const nextConfig: AppConfig = {
-    apiUrl: apiUrlInput.value,
-    accessToken: accessTokenInput.value,
-    avatarUrl: avatarUrlInput.value,
-  };
-  config = saveConfig(nextConfig);
-  settingsDialog.close();
-  void avatar.load(config.avatarUrl).catch((error) => {
-    addMessage("system", `Avatar model failed to load; using the built-in avatar. ${String(error)}`);
-    void avatar.load("");
-  });
+  void (async () => {
+    settingsError.hidden = true;
+    saveSettings.disabled = true;
+    saveSettings.textContent = "Loading…";
+    try {
+      const file = avatarFileInput.files?.[0];
+      const remoteUrl = avatarUrlInput.value.trim();
+      let savedAvatarName = "";
+
+      if (file) {
+        validateAvatarFile(file);
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          await avatar.load(objectUrl);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+        const stored = await saveAvatarFile(file);
+        savedAvatarName = stored.name;
+        await refreshAvatarFileStatus();
+      } else if (remoteUrl) {
+        const parsed = new URL(remoteUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error("The GLB URL must use http:// or https://.");
+        await avatar.load(remoteUrl);
+        await removeSavedAvatar();
+        hasSavedAvatar = false;
+      } else if (!hasSavedAvatar) {
+        await avatar.load("");
+      }
+
+      const nextConfig: AppConfig = {
+        apiUrl: apiUrlInput.value,
+        accessToken: accessTokenInput.value,
+        avatarUrl: file ? "" : remoteUrl,
+      };
+      config = saveConfig(nextConfig);
+      settingsDialog.close();
+      addMessage("system", savedAvatarName ? `Avatar saved: ${savedAvatarName}` : "Settings saved.");
+    } catch (error) {
+      showSettingsError(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      saveSettings.disabled = false;
+      saveSettings.textContent = "Save settings";
+    }
+  })();
 });
 
 composer.addEventListener("submit", (event) => {
@@ -172,5 +255,15 @@ micButton.addEventListener("click", () => {
 });
 
 window.addEventListener("beforeunload", () => void client?.disconnect());
-void avatar.load(config.avatarUrl).catch(() => avatar.load(""));
+void (async () => {
+  try {
+    const stored = await getSavedAvatar();
+    hasSavedAvatar = stored !== null;
+    if (stored) await withAvatarObjectUrl(stored, (url) => avatar.load(url));
+    else await avatar.load(config.avatarUrl);
+  } catch (error) {
+    addMessage("system", `Saved avatar could not be loaded. ${error instanceof Error ? error.message : String(error)}`);
+    await avatar.load("");
+  }
+})();
 updateStatus("idle", "Ready");

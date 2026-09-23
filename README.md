@@ -77,6 +77,12 @@ Then open `http://127.0.0.1:5173`. The settings dialog accepts:
 
 The access token is stored only in `sessionStorage`. Do not put a production `APP_API_KEY`, OpenAI API key, database credential, or administrative token in a Vite environment variable: `VITE_*` values are public after build.
 
+## Avatar GLB files
+
+Open settings and either choose a local `.glb` file or enter a public GLB URL. Local files are validated, loaded, and saved in the browser's IndexedDB, so they remain selected after a reload without being uploaded to the backend. The current limit is 50 MB.
+
+Remote URLs are loaded directly by the browser and therefore require CORS permission from the file host. If a remote model is blocked or invalid, the settings dialog remains open and displays the loading error. Use the local file option when a CDN does not provide the required CORS headers.
+
 ## Backend configuration
 
 For local development, configure the Python API with:

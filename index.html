@@ -71,7 +71,7 @@
     </main>
 
     <dialog id="settings-dialog">
-      <form id="settings-form" method="dialog">
+      <form id="settings-form" method="dialog" novalidate>
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">Connection</p>
@@ -90,14 +90,22 @@
           <small>Kept only for this browser tab. Never compile a shared secret into a public frontend.</small>
         </label>
         <label>
-          Avatar GLB URL <span class="optional">optional</span>
+          Avatar GLB file <span class="optional">recommended</span>
+          <input id="avatar-file-input" name="avatarFile" type="file" accept=".glb,model/gltf-binary" />
+          <small id="avatar-file-status">Stored only in this browser. Maximum size: 50 MB.</small>
+        </label>
+        <label>
+          Or use a GLB URL <span class="optional">optional</span>
           <input id="avatar-url-input" name="avatarUrl" type="url" placeholder="https://example.com/avatar.glb" />
-          <small>Leave blank to use the built-in procedural avatar.</small>
+          <small>The remote server must allow browser CORS requests. Selecting a file takes precedence.</small>
         </label>
 
+        <p id="settings-error" class="form-error" role="alert" hidden></p>
+
         <div class="dialog-actions">
+          <button class="text-button danger-button" value="clear-avatar" type="button" id="clear-avatar" hidden>Remove saved GLB</button>
           <button class="secondary-button" value="cancel" type="button" id="cancel-settings">Cancel</button>
-          <button class="primary-button" value="save" type="submit">Save settings</button>
+          <button class="primary-button" value="save" type="submit" id="save-settings">Save settings</button>
         </div>
       </form>
     </dialog>

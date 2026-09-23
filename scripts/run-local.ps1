@@ -51,6 +51,27 @@ function Stop-ProcessTree([System.Diagnostics.Process]$Process) {
     & taskkill.exe /PID $Process.Id /T /F *> $null
 }
 
+function Stop-OwnedListener([int]$Port, [string[]]$ExpectedCommandParts) {
+    $connections = Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    foreach ($connection in $connections) {
+        $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$($connection.OwningProcess)" -ErrorAction SilentlyContinue
+        $commandLine = [string]$processInfo.CommandLine
+        $isOwned = $false
+        foreach ($part in $ExpectedCommandParts) {
+            if ($part -and $commandLine.IndexOf($part, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $isOwned = $true
+                break
+            }
+        }
+        if ($isOwned) {
+            & taskkill.exe /PID $connection.OwningProcess /T /F *> $null
+        }
+        else {
+            Write-Warning "Process $($connection.OwningProcess) still owns port $Port and was not started by this launcher."
+        }
+    }
+}
+
 if (-not (Test-PortAvailable $BackendPort)) { throw "Port $BackendPort is already in use." }
 if (-not (Test-PortAvailable $FrontendPort)) { throw "Port $FrontendPort is already in use." }
 
@@ -112,8 +133,9 @@ try {
     Wait-Http "http://127.0.0.1:$BackendPort/v1/health" $backendProcess $backendErr
 
     Write-Host "Starting the frontend on http://127.0.0.1:$FrontendPort ..." -ForegroundColor Cyan
-    $frontendProcess = Start-Process -FilePath "npm.cmd" `
-        -ArgumentList @("run", "dev", "--", "--host", "127.0.0.1", "--port", "$FrontendPort") `
+    $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
+    $frontendProcess = Start-Process -FilePath $nodePath `
+        -ArgumentList @("node_modules\vite\bin\vite.js", "--host", "127.0.0.1", "--port", "$FrontendPort", "--strictPort") `
         -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr
     Wait-Http "http://127.0.0.1:$FrontendPort" $frontendProcess $frontendErr
@@ -128,6 +150,8 @@ try {
 finally {
     Stop-ProcessTree $frontendProcess
     Stop-ProcessTree $backendProcess
+    Stop-OwnedListener $FrontendPort @($frontendPath, "vite.js")
+    Stop-OwnedListener $BackendPort @($venvPath, "examples.prototype_server:app")
     $env:OPENAI_API_KEY = $null
     Write-Host "Local prototype stopped." -ForegroundColor Yellow
 }
