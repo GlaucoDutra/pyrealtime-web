@@ -10,7 +10,8 @@ A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyre
 - Persistent microphone selection with live device switching
 - Structured Realtime function-call handling
 - Secure forwarding of application tools to `POST /v1/tools/{tool_name}`
-- Local `get_available_animations` and `play_avatar_animation` tools
+- Local navigation, `get_available_animations`, and `play_avatar_animation` tools
+- Server-side web search, file search, private model calls, and image generation
 - Chat attachments prepared by the reusable PyRealtime file API
 - A smooth antialiased Three.js avatar canvas with optional GLB loading
 - A procedural fallback avatar, embedded gestures, and audio-reactive animation
@@ -34,7 +35,7 @@ PyRealtime API
   └─ executes registered backend tools
 ```
 
-Avatar tools execute locally because the avatar exists in the browser. Every other function call is forwarded to the PyRealtime backend. Function results are returned to the model as `function_call_output` events.
+Avatar and navigation tools execute locally because their effects exist in the browser. Every other function call is forwarded to the PyRealtime backend. Function results are returned to the model as `function_call_output` events. Generated images are rendered in the conversation while their large base64 payloads stay out of the Realtime data channel.
 
 The reusable boundary is documented in [ARCHITECTURE.md](ARCHITECTURE.md): processing and policy belong to PyRealtime; browser UI, devices, rendering, and Realtime event dispatch belong here.
 
@@ -58,7 +59,7 @@ Clone `pyrealtime` and `pyrealtime-web` as sibling directories, then double-clic
 
 The launcher securely prompts for `OPENAI_API_KEY`, creates an isolated Python environment, starts both services on `127.0.0.1`, and opens the frontend. The key remains only in the local backend process environment. Press Enter in the launcher window to stop both services.
 
-The prototype includes backend tools for local time, exact arithmetic, remembering notes, and listing notes, plus local avatar animation tools.
+The prototype includes backend tools for local time, exact arithmetic, remembering notes, listing notes, hosted web search, private model calls, and image generation, plus local navigation and avatar animation tools. Hosted file search is added automatically when `PYREALTIME_VECTOR_STORE_IDS` contains one or more OpenAI vector store IDs.
 
 ### Manual development
 
@@ -110,6 +111,9 @@ For local development, configure the Python API with:
 OPENAI_API_KEY=sk-your-server-key
 APP_API_KEY=local-development-secret
 APP_CORS_ORIGINS=http://127.0.0.1:5173
+PYREALTIME_TOOL_MODEL=gpt-5-mini
+PYREALTIME_IMAGE_MODEL=gpt-image-2.5-flare
+PYREALTIME_VECTOR_STORE_IDS=
 ```
 
 Run the example backend from the PyRealtime repository:
@@ -124,12 +128,12 @@ For a public deployment, replace the shared `APP_API_KEY` with PyRealtime's cust
 ## Tool-call flow
 
 1. The backend creates a Realtime session containing its registered tool schemas.
-2. The frontend preserves those schemas and adds the two avatar tools.
+2. The frontend preserves those schemas and adds navigation plus the two avatar tools.
 3. OpenAI emits a structured function call through the WebRTC data channel.
 4. The frontend assembles streamed arguments by `call_id`.
-5. Avatar functions run locally; other functions are posted to PyRealtime.
+5. Browser navigation and avatar functions run locally; other functions are posted to PyRealtime.
 6. The frontend sends the result back as `function_call_output`.
-7. Backend tool calls continue the assistant response. Avatar playback stays nonverbal.
+7. Backend tool calls continue the assistant response. Generated images appear in the conversation, and avatar playback stays nonverbal.
 
 ## Commands
 

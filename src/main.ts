@@ -93,6 +93,21 @@ function addMessage(role: "user" | "assistant" | "system" | "tool", text: string
   return article;
 }
 
+function addGeneratedImage(dataUrl: string, description: string): void {
+  const article = document.createElement("article");
+  article.className = "message message-tool generated-image-message";
+  const label = document.createElement("span");
+  label.className = "message-role";
+  label.textContent = "Generated image";
+  const image = document.createElement("img");
+  image.className = "generated-image";
+  image.src = dataUrl;
+  image.alt = description || "Generated image";
+  article.append(label, image);
+  messages.append(article);
+  scrollMessages();
+}
+
 function setPendingFile(file: File | null): void {
   pendingFile = file;
   attachmentPreview.hidden = file === null;
@@ -117,7 +132,7 @@ function updateTranscript(role: "user" | "assistant", text: string, final: boole
 
 function createClient(): RealtimeClient {
   const backend = new BackendClient(config);
-  const tools = new ToolRouter(backend, avatar);
+  const tools = new ToolRouter(backend, avatar, { onGeneratedImage: addGeneratedImage });
   return new RealtimeClient(backend, tools, {
     onStatus: updateStatus,
     onTranscript: updateTranscript,

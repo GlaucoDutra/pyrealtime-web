@@ -229,6 +229,8 @@ h2 { font-size: 25px; }
 
 .message { width: min(88%, 560px); margin: 0 0 16px; }
 .message p { margin: 5px 0 0; padding: 12px 15px; border: 1px solid var(--line); border-radius: 6px 18px 18px; background: rgba(16, 32, 52, 0.75); line-height: 1.52; white-space: pre-wrap; }
+.generated-image-message { width: min(100%, 480px); }
+.generated-image { display: block; width: 100%; height: auto; margin-top: 8px; border-radius: 12px; }
 .message-user { margin-left: auto; text-align: right; }
 .message-user p { border-color: rgba(61, 153, 255, 0.28); border-radius: 18px 6px 18px 18px; background: linear-gradient(135deg, rgba(36, 102, 182, 0.72), rgba(26, 67, 122, 0.72)); text-align: left; }
 .message-system { width: 100%; color: var(--muted); }

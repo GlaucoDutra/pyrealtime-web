@@ -10,7 +10,25 @@ export interface ToolExecutionResult {
   continueResponse: boolean;
 }
 
+export interface ToolRouterEvents {
+  onGeneratedImage?: (dataUrl: string, description: string) => void;
+}
+
 export const avatarToolSchemas = [
+  {
+    type: "function",
+    name: "navigate_to_url",
+    description: "Open an HTTP or HTTPS URL only when the user explicitly requests navigation.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Absolute URL starting with https:// or http://" },
+        new_tab: { type: "boolean", description: "Open in a new tab. Defaults to true." },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
   {
     type: "function",
     name: "get_available_animations",
@@ -47,9 +65,21 @@ export class ToolRouter {
   constructor(
     private readonly backend: BackendClient,
     private readonly avatar: AvatarToolHost,
+    private readonly events: ToolRouterEvents = {},
   ) {}
 
   async execute(name: string, argumentsValue: Record<string, unknown>): Promise<ToolExecutionResult> {
+    if (name === "navigate_to_url") {
+      const rawUrl = String(argumentsValue.url ?? "").trim();
+      if (!rawUrl) throw new Error("navigate_to_url requires url");
+      const url = new URL(rawUrl);
+      if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed");
+      const newTab = argumentsValue.new_tab !== false;
+      const opened = window.open(url.toString(), newTab ? "_blank" : "_self", newTab ? "noopener,noreferrer" : undefined);
+      if (!opened && newTab) throw new Error("The browser blocked the new tab");
+      return { output: { ok: true, url: url.toString() }, continueResponse: true };
+    }
+
     if (name === "get_available_animations") {
       const animations = this.avatar.availableAnimations();
       return {
@@ -70,10 +100,21 @@ export class ToolRouter {
       return { output, continueResponse: false };
     }
 
-    return {
-      output: await this.backend.callTool(name, argumentsValue),
-      continueResponse: true,
-    };
+    const output = await this.backend.callTool(name, argumentsValue);
+    if (name === "generate_image" && output !== null && typeof output === "object") {
+      const result = output as Record<string, unknown>;
+      const dataUrl = typeof result.image_data_uri === "string" ? result.image_data_uri : "";
+      if (dataUrl.startsWith("data:image/")) {
+        this.events.onGeneratedImage?.(dataUrl, String(result.revised_prompt ?? "Generated image"));
+        const safeOutput: Record<string, unknown> = {
+          ...result,
+          message: "The image was generated and shown to the user.",
+        };
+        delete safeOutput.image_data_uri;
+        return { output: safeOutput, continueResponse: true };
+      }
+    }
+    return { output, continueResponse: true };
   }
 }
 
