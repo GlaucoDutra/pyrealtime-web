@@ -5,6 +5,7 @@ export interface AppConfig {
 }
 
 const CONFIG_KEY = "pyrealtime-web-config";
+const SESSION_CONFIG_KEY = "pyrealtime-web-session-config";
 const TOKEN_KEY = "pyrealtime-web-access-token";
 
 function normalizeUrl(value: string): string {
@@ -14,16 +15,48 @@ function normalizeUrl(value: string): string {
 export function loadConfig(): AppConfig {
   let saved: Partial<AppConfig> = {};
   try {
-    saved = JSON.parse(localStorage.getItem(CONFIG_KEY) ?? "{}") as Partial<AppConfig>;
+    const raw = localStorage.getItem(CONFIG_KEY) ?? sessionStorage.getItem(SESSION_CONFIG_KEY) ?? "{}";
+    saved = JSON.parse(raw) as Partial<AppConfig>;
   } catch {
-    localStorage.removeItem(CONFIG_KEY);
+    try { localStorage.removeItem(CONFIG_KEY); } catch { /* storage can be disabled */ }
+    try { sessionStorage.removeItem(SESSION_CONFIG_KEY); } catch { /* storage can be disabled */ }
   }
 
   return {
     apiUrl: normalizeUrl(saved.apiUrl || import.meta.env.VITE_APP_BASE_URL || "http://127.0.0.1:8000"),
-    accessToken: sessionStorage.getItem(TOKEN_KEY) ?? "",
+    accessToken: safeSessionValue(TOKEN_KEY),
     avatarUrl: normalizeUrl(saved.avatarUrl || import.meta.env.VITE_AVATAR_MODEL_URL || ""),
   };
+}
+
+function safeSessionValue(key: string): string {
+  try {
+    return sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function persistCompactConfig(value: string): void {
+  try {
+    localStorage.setItem(CONFIG_KEY, value);
+    try { sessionStorage.removeItem(SESSION_CONFIG_KEY); } catch { /* optional cleanup */ }
+    return;
+  } catch {
+    // Older prototype builds could leave an unexpectedly large value under
+    // this key. Removing it before retrying immediately frees that quota.
+    try { localStorage.removeItem(CONFIG_KEY); } catch { /* storage can be disabled */ }
+  }
+
+  try {
+    localStorage.setItem(CONFIG_KEY, value);
+    return;
+  } catch {
+    // Browsers may expose a very small or disabled localStorage area. The
+    // settings are tiny, so sessionStorage is an adequate non-fatal fallback.
+  }
+
+  try { sessionStorage.setItem(SESSION_CONFIG_KEY, value); } catch { /* use in-memory config for this page */ }
 }
 
 export function saveConfig(config: AppConfig): AppConfig {
@@ -33,15 +66,11 @@ export function saveConfig(config: AppConfig): AppConfig {
     avatarUrl: normalizeUrl(config.avatarUrl),
   };
 
-  localStorage.setItem(
-    CONFIG_KEY,
-    JSON.stringify({ apiUrl: normalized.apiUrl, avatarUrl: normalized.avatarUrl }),
-  );
-  if (normalized.accessToken) {
-    sessionStorage.setItem(TOKEN_KEY, normalized.accessToken);
-  } else {
-    sessionStorage.removeItem(TOKEN_KEY);
-  }
+  persistCompactConfig(JSON.stringify({ apiUrl: normalized.apiUrl, avatarUrl: normalized.avatarUrl }));
+  try {
+    if (normalized.accessToken) sessionStorage.setItem(TOKEN_KEY, normalized.accessToken);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch { /* keep the token in memory for this page */ }
   return normalized;
 }
 
