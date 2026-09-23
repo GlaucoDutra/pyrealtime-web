@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07111f" />
+    <meta
+      name="description"
+      content="A secure, open-source browser frontend for PyRealtime voice and avatar applications."
+    />
+    <title>PyRealtime</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="PyRealtime home">
+          <span class="brand-mark" aria-hidden="true">P</span>
+          <span>
+            <strong>PyRealtime</strong>
+            <small>Voice + tools, in real time</small>
+          </span>
+        </a>
+        <div class="topbar-actions">
+          <span id="connection-status" class="status-pill" data-state="idle">
+            <span class="status-dot"></span>
+            <span id="connection-label">Ready</span>
+          </span>
+          <button id="settings-button" class="icon-button" type="button" aria-label="Open settings">⚙</button>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="Realtime assistant">
+        <div class="avatar-panel">
+          <canvas id="avatar-canvas" aria-label="Animated avatar"></canvas>
+          <div class="avatar-glow" aria-hidden="true"></div>
+          <div class="avatar-overlay">
+            <span id="avatar-state">offline</span>
+            <button id="connect-button" class="primary-button" type="button">Connect</button>
+          </div>
+        </div>
+
+        <div class="conversation-panel">
+          <div class="conversation-heading">
+            <div>
+              <p class="eyebrow">Realtime session</p>
+              <h1>Talk naturally. Act through tools.</h1>
+            </div>
+            <button id="clear-button" class="text-button" type="button">Clear</button>
+          </div>
+
+          <div id="messages" class="messages" aria-live="polite">
+            <article class="message message-system">
+              <span class="message-role">System</span>
+              <p>Configure your PyRealtime API, then connect to begin.</p>
+            </article>
+          </div>
+
+          <form id="composer" class="composer">
+            <label class="sr-only" for="message-input">Message</label>
+            <textarea id="message-input" rows="1" placeholder="Ask anything…" disabled></textarea>
+            <button id="mic-button" class="control-button" type="button" aria-label="Mute microphone" disabled>Mic on</button>
+            <button id="send-button" class="send-button" type="submit" disabled>Send</button>
+          </form>
+        </div>
+      </section>
+
+      <footer>
+        <span>Public reference client</span>
+        <a href="https://github.com/GlaucoDutra/pyrealtime" target="_blank" rel="noreferrer">Python backend ↗</a>
+      </footer>
+    </main>
+
+    <dialog id="settings-dialog">
+      <form id="settings-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Connection</p>
+            <h2>Frontend settings</h2>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Close settings">×</button>
+        </div>
+
+        <label>
+          PyRealtime API URL
+          <input id="api-url-input" name="apiUrl" type="url" placeholder="http://127.0.0.1:8000" required />
+        </label>
+        <label>
+          Access token
+          <input id="access-token-input" name="accessToken" type="password" autocomplete="off" placeholder="User JWT or development API key" />
+          <small>Kept only for this browser tab. Never compile a shared secret into a public frontend.</small>
+        </label>
+        <label>
+          Avatar GLB URL <span class="optional">optional</span>
+          <input id="avatar-url-input" name="avatarUrl" type="url" placeholder="https://example.com/avatar.glb" />
+          <small>Leave blank to use the built-in procedural avatar.</small>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel" type="button" id="cancel-settings">Cancel</button>
+          <button class="primary-button" value="save" type="submit">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
