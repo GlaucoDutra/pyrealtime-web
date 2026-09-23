@@ -1,12 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$BackendPath = (Join-Path $PSScriptRoot "..\..\pyrealtime"),
+    [string]$BackendPath = "",
     [int]$BackendPort = 8000,
     [int]$FrontendPort = 5173
 )
 
 $ErrorActionPreference = "Stop"
 $frontendPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+if ([string]::IsNullOrWhiteSpace($BackendPath)) {
+    $BackendPath = Join-Path $frontendPath "..\pyrealtime"
+}
 $resolvedBackendPath = (Resolve-Path $BackendPath).Path
 $backendProject = Join-Path $resolvedBackendPath "pyproject.toml"
 if (-not (Test-Path -LiteralPath $backendProject -PathType Leaf)) {
