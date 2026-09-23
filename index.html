@@ -45,7 +45,15 @@
               <p class="eyebrow">Realtime session</p>
               <h1>Talk naturally. Act through tools.</h1>
             </div>
-            <button id="clear-button" class="text-button" type="button">Clear</button>
+            <div class="conversation-actions">
+              <label class="microphone-picker" for="microphone-select">
+                <span aria-hidden="true">Mic</span>
+                <select id="microphone-select" aria-label="Select microphone">
+                  <option value="">Default microphone</option>
+                </select>
+              </label>
+              <button id="clear-button" class="text-button" type="button">Clear</button>
+            </div>
           </div>
 
           <div id="messages" class="messages" aria-live="polite">

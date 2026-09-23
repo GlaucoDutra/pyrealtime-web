@@ -7,6 +7,7 @@ A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyre
 - WebRTC audio sessions created through the PyRealtime backend
 - Live user and assistant transcripts
 - Text and microphone input
+- Persistent microphone selection with live device switching
 - Structured Realtime function-call handling
 - Secure forwarding of application tools to `POST /v1/tools/{tool_name}`
 - Local `get_available_animations` and `play_avatar_animation` tools

@@ -2,6 +2,7 @@ export interface AppConfig {
   apiUrl: string;
   accessToken: string;
   avatarUrl: string;
+  microphoneId: string;
 }
 
 const CONFIG_KEY = "pyrealtime-web-config";
@@ -26,6 +27,7 @@ export function loadConfig(): AppConfig {
     apiUrl: normalizeUrl(saved.apiUrl || import.meta.env.VITE_APP_BASE_URL || "http://127.0.0.1:8000"),
     accessToken: safeSessionValue(TOKEN_KEY),
     avatarUrl: normalizeUrl(saved.avatarUrl || import.meta.env.VITE_AVATAR_MODEL_URL || ""),
+    microphoneId: saved.microphoneId || "",
   };
 }
 
@@ -64,9 +66,14 @@ export function saveConfig(config: AppConfig): AppConfig {
     apiUrl: normalizeUrl(config.apiUrl),
     accessToken: config.accessToken.trim(),
     avatarUrl: normalizeUrl(config.avatarUrl),
+    microphoneId: config.microphoneId.trim(),
   };
 
-  persistCompactConfig(JSON.stringify({ apiUrl: normalized.apiUrl, avatarUrl: normalized.avatarUrl }));
+  persistCompactConfig(JSON.stringify({
+    apiUrl: normalized.apiUrl,
+    avatarUrl: normalized.avatarUrl,
+    microphoneId: normalized.microphoneId,
+  }));
   try {
     if (normalized.accessToken) sessionStorage.setItem(TOKEN_KEY, normalized.accessToken);
     else sessionStorage.removeItem(TOKEN_KEY);

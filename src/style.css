@@ -49,6 +49,35 @@ button { color: inherit; }
   justify-content: space-between;
 }
 
+.conversation-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 0; }
+.microphone-picker {
+  height: 36px;
+  max-width: 210px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--cyan);
+  background: rgba(7, 17, 31, 0.8);
+  font-size: 11px;
+  font-weight: 700;
+}
+.microphone-picker select {
+  min-width: 0;
+  width: 145px;
+  border: 0;
+  outline: 0;
+  color: #dcecff;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+.microphone-picker option { color: #dcecff; background: #0b1727; }
+.microphone-picker:focus-within { border-color: rgba(99, 230, 255, 0.55); box-shadow: 0 0 0 3px rgba(99, 230, 255, 0.07); }
+.microphone-picker:has(select:disabled) { opacity: 0.5; }
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -307,6 +336,10 @@ dialog small { color: var(--muted); font-weight: 400; line-height: 1.4; }
   .workspace { min-height: auto; gap: 10px; }
   .avatar-panel, .conversation-panel { border-radius: 20px; }
   .conversation-panel { min-height: 520px; padding: 20px 15px 15px; }
+  .conversation-heading { align-items: flex-start; gap: 8px; }
+  .conversation-actions { flex-direction: column-reverse; align-items: flex-end; }
+  .microphone-picker { max-width: 155px; }
+  .microphone-picker select { width: 102px; }
   .composer { grid-template-columns: 1fr auto auto; }
   .attach-button { grid-column: 1; grid-row: 2; }
   .control-button:not(.attach-button) { grid-column: 2; grid-row: 2; }

@@ -50,7 +50,7 @@ export class RealtimeClient {
     return this.channel?.readyState === "open";
   }
 
-  async connect(): Promise<void> {
+  async connect(microphoneDeviceId = ""): Promise<void> {
     if (this.peer) await this.disconnect();
     this.events.onStatus?.("connecting", "Connecting");
     this.abortController = new AbortController();
@@ -59,7 +59,12 @@ export class RealtimeClient {
 
     try {
       const microphone = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          ...(microphoneDeviceId ? { deviceId: { exact: microphoneDeviceId } } : {}),
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
       this.microphone = microphone;
       for (const track of microphone.getTracks()) peer.addTrack(track, microphone);
@@ -246,6 +251,34 @@ export class RealtimeClient {
 
   setMicrophoneMuted(muted: boolean): void {
     for (const track of this.microphone?.getAudioTracks() ?? []) track.enabled = !muted;
+  }
+
+  async switchMicrophone(deviceId = ""): Promise<void> {
+    if (!this.peer || !this.microphone) throw new Error("Connect before switching microphones");
+    const replacement = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    const newTrack = replacement.getAudioTracks()[0];
+    const sender = this.peer.getSenders().find((candidate) => candidate.track?.kind === "audio");
+    if (!newTrack || !sender) {
+      replacement.getTracks().forEach((track) => track.stop());
+      throw new Error("The selected microphone could not be attached to the session");
+    }
+    const oldMicrophone = this.microphone;
+    newTrack.enabled = oldMicrophone.getAudioTracks()[0]?.enabled ?? true;
+    try {
+      await sender.replaceTrack(newTrack);
+      this.microphone = replacement;
+      oldMicrophone.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      replacement.getTracks().forEach((track) => track.stop());
+      throw error;
+    }
   }
 
   private receive(raw: unknown): void {

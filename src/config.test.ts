@@ -27,10 +27,10 @@ describe("configuration persistence", () => {
   });
 
   it("stores only compact public configuration in localStorage", () => {
-    saveConfig({ apiUrl: "http://127.0.0.1:8000/", accessToken: "secret", avatarUrl: "" });
+    saveConfig({ apiUrl: "http://127.0.0.1:8000/", accessToken: "secret", avatarUrl: "", microphoneId: "mic-2" });
 
     expect(localStorage.getItem("pyrealtime-web-config")).toBe(
-      '{"apiUrl":"http://127.0.0.1:8000","avatarUrl":""}',
+      '{"apiUrl":"http://127.0.0.1:8000","avatarUrl":"","microphoneId":"mic-2"}',
     );
     expect(localStorage.getItem("pyrealtime-web-config")).not.toContain("secret");
     expect(sessionStorage.getItem("pyrealtime-web-access-token")).toBe("secret");
@@ -39,14 +39,14 @@ describe("configuration persistence", () => {
   it("recovers from a quota error by removing the old record and retrying", () => {
     vi.stubGlobal("localStorage", memoryStorage({ failWrites: 1 }));
 
-    expect(() => saveConfig({ apiUrl: "http://localhost:8000", accessToken: "", avatarUrl: "" })).not.toThrow();
+    expect(() => saveConfig({ apiUrl: "http://localhost:8000", accessToken: "", avatarUrl: "", microphoneId: "" })).not.toThrow();
     expect(loadConfig().apiUrl).toBe("http://localhost:8000");
   });
 
   it("falls back to sessionStorage when localStorage remains unavailable", () => {
     vi.stubGlobal("localStorage", memoryStorage({ failWrites: 10 }));
 
-    expect(() => saveConfig({ apiUrl: "http://localhost:9000", accessToken: "", avatarUrl: "" })).not.toThrow();
+    expect(() => saveConfig({ apiUrl: "http://localhost:9000", accessToken: "", avatarUrl: "", microphoneId: "" })).not.toThrow();
     expect(loadConfig().apiUrl).toBe("http://localhost:9000");
   });
 });

@@ -32,6 +32,7 @@ const composer = element<HTMLFormElement>("composer");
 const messageInput = element<HTMLTextAreaElement>("message-input");
 const sendButton = element<HTMLButtonElement>("send-button");
 const micButton = element<HTMLButtonElement>("mic-button");
+const microphoneSelect = element<HTMLSelectElement>("microphone-select");
 const attachButton = element<HTMLButtonElement>("attach-button");
 const chatFileInput = element<HTMLInputElement>("chat-file-input");
 const attachmentPreview = element<HTMLDivElement>("attachment-preview");
@@ -70,6 +71,7 @@ function updateStatus(state: ConnectionState, label: string): void {
   messageInput.disabled = !connected;
   sendButton.disabled = !connected;
   micButton.disabled = !connected;
+  microphoneSelect.disabled = busy;
   attachButton.disabled = !connected;
 }
 
@@ -128,6 +130,25 @@ function createClient(): RealtimeClient {
   });
 }
 
+async function refreshMicrophones(): Promise<boolean> {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    microphoneSelect.replaceChildren(new Option("Microphone selection unavailable", ""));
+    microphoneSelect.disabled = true;
+    return false;
+  }
+  const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput");
+  const selectedExists = !config.microphoneId || inputs.some((device) => device.deviceId === config.microphoneId);
+  if (!selectedExists) config = saveConfig({ ...config, microphoneId: "" });
+  const options = [new Option("Default microphone", "")];
+  inputs.forEach((device, index) => {
+    options.push(new Option(device.label || `Microphone ${index + 1}`, device.deviceId));
+  });
+  microphoneSelect.replaceChildren(...options);
+  microphoneSelect.value = config.microphoneId;
+  microphoneSelect.disabled = false;
+  return selectedExists;
+}
+
 async function connect(): Promise<void> {
   if (client?.connected) {
     await client.disconnect();
@@ -136,7 +157,9 @@ async function connect(): Promise<void> {
   }
   client = createClient();
   try {
-    await client.connect();
+    await client.connect(config.microphoneId);
+    client.setMicrophoneMuted(muted);
+    await refreshMicrophones();
     addMessage("system", "Realtime session connected.");
   } catch {
     client = null;
@@ -231,6 +254,7 @@ settingsForm.addEventListener("submit", (event) => {
         apiUrl: apiUrlInput.value,
         accessToken: accessTokenInput.value,
         avatarUrl: file ? "" : remoteUrl,
+        microphoneId: config.microphoneId,
       };
       config = saveConfig(nextConfig);
       settingsDialog.close();
@@ -313,6 +337,34 @@ micButton.addEventListener("click", () => {
   micButton.textContent = muted ? "Mic off" : "Mic on";
 });
 
+microphoneSelect.addEventListener("change", () => {
+  const previousId = config.microphoneId;
+  const nextId = microphoneSelect.value;
+  config = saveConfig({ ...config, microphoneId: nextId });
+  if (!client?.connected) return;
+  microphoneSelect.disabled = true;
+  void client.switchMicrophone(nextId).then(() => {
+    const name = microphoneSelect.selectedOptions[0]?.textContent || "Default microphone";
+    addMessage("system", `Microphone changed to ${name}.`);
+  }).catch((error) => {
+    config = saveConfig({ ...config, microphoneId: previousId });
+    microphoneSelect.value = previousId;
+    addMessage("system", `Could not switch microphone. ${error instanceof Error ? error.message : String(error)}`);
+  }).finally(() => {
+    microphoneSelect.disabled = false;
+  });
+});
+
+navigator.mediaDevices?.addEventListener("devicechange", () => {
+  const previousId = config.microphoneId;
+  void refreshMicrophones().then((selectedStillExists) => {
+    if (!selectedStillExists && previousId && client?.connected) {
+      return client.switchMicrophone("").then(() => addMessage("system", "The selected microphone was removed. Using the default microphone."));
+    }
+    return undefined;
+  }).catch((error) => addMessage("system", `Could not refresh microphones. ${error instanceof Error ? error.message : String(error)}`));
+});
+
 window.addEventListener("beforeunload", () => void client?.disconnect());
 void (async () => {
   try {
@@ -326,3 +378,4 @@ void (async () => {
   }
 })();
 updateStatus("idle", "Ready");
+void refreshMicrophones().catch(() => undefined);
