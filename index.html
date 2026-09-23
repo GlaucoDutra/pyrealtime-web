@@ -56,8 +56,23 @@
           </div>
 
           <form id="composer" class="composer">
+            <div id="attachment-preview" class="attachment-preview" hidden>
+              <span class="attachment-icon" aria-hidden="true">↗</span>
+              <span>
+                <strong id="attachment-name"></strong>
+                <small id="attachment-meta"></small>
+              </span>
+              <button id="remove-attachment" type="button" aria-label="Remove attachment">×</button>
+            </div>
             <label class="sr-only" for="message-input">Message</label>
             <textarea id="message-input" rows="1" placeholder="Ask anything…" disabled></textarea>
+            <input
+              id="chat-file-input"
+              class="sr-only"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.csv,.json,.js,.ts,.html,.css,.xml,.pdf,.xlsx,.xls,.xlsm,.xlsb,.ods,.doc,.docx,.ppt,.pptx"
+            />
+            <button id="attach-button" class="control-button attach-button" type="button" aria-label="Attach a file" disabled>Attach</button>
             <button id="mic-button" class="control-button" type="button" aria-label="Mute microphone" disabled>Mic on</button>
             <button id="send-button" class="send-button" type="submit" disabled>Send</button>
           </form>

@@ -1,4 +1,5 @@
 import type { BackendClient } from "./backend-client";
+import { MAX_DATA_CHANNEL_BYTES, prepareAttachment, splitText } from "./file-processing";
 import { ToolCallAccumulator, type CompletedToolCall } from "./tool-call-accumulator";
 import { mergeToolSchemas, type ToolRouter } from "./tool-router";
 
@@ -123,6 +124,21 @@ export class RealtimeClient {
     this.channel.send(JSON.stringify(event));
   }
 
+  private async sendSafely(event: Record<string, unknown>): Promise<void> {
+    if (!this.channel || this.channel.readyState !== "open") throw new Error("Realtime channel is not open");
+    const payload = JSON.stringify(event);
+    const bytes = new TextEncoder().encode(payload).length;
+    if (bytes > MAX_DATA_CHANNEL_BYTES) {
+      throw new Error(`Realtime data-channel payload is too large (${bytes.toLocaleString()} bytes)`);
+    }
+    while (this.channel.bufferedAmount > 256_000) {
+      await new Promise((resolve) => window.setTimeout(resolve, 20));
+      if (this.channel.readyState !== "open") throw new Error("Realtime channel closed while sending the file");
+    }
+    this.channel.send(payload);
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+  }
+
   sendText(text: string): void {
     const value = text.trim();
     if (!value) return;
@@ -132,6 +148,94 @@ export class RealtimeClient {
         type: "message",
         role: "user",
         content: [{ type: "input_text", text: value }],
+      },
+    });
+    this.send({ type: "response.create" });
+  }
+
+  async sendFile(file: File, caption: string, onProgress?: (message: string) => void): Promise<void> {
+    const instruction = caption.trim() || "Please analyze this file.";
+    const attachment = await prepareAttachment(file, onProgress);
+
+    if (attachment.kind === "image") {
+      onProgress?.("Sending image…");
+      await this.sendSafely({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [
+            { type: "input_text", text: instruction },
+            { type: "input_image", image_url: attachment.dataUrl },
+          ],
+        },
+      });
+      this.send({ type: "response.create" });
+      return;
+    }
+
+    if (attachment.kind === "text") {
+      const { chunks, truncated } = splitText(attachment.text);
+      onProgress?.(`Sending ${chunks.length} file chunk${chunks.length === 1 ? "" : "s"}…`);
+      await this.sendSafely({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{
+            type: "input_text",
+            text: [
+              "The user attached a file for analysis.",
+              `File name: ${attachment.fileName}`,
+              `File type: ${attachment.extension || "unknown"}`,
+              `User instruction: ${instruction}`,
+              `The content follows in ${chunks.length} chunks. Do not answer until [END OF FILE].`,
+            ].join("\n"),
+          }],
+        },
+      });
+      for (let index = 0; index < chunks.length; index += 1) {
+        onProgress?.(`Sending chunk ${index + 1} of ${chunks.length}…`);
+        await this.sendSafely({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: `[FILE CHUNK ${index + 1} OF ${chunks.length}]\n${chunks[index]}` }],
+          },
+        });
+      }
+      await this.sendSafely({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{
+            type: "input_text",
+            text: `[END OF FILE]\n${truncated ? "The file was truncated to 120000 characters.\n" : ""}Analyze the complete file now and follow the user's instruction.`,
+          }],
+        },
+      });
+      this.send({ type: "response.create" });
+      return;
+    }
+
+    onProgress?.("Sending file notice…");
+    await this.sendSafely({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [{
+          type: "input_text",
+          text: [
+            "The user attached a file that cannot be parsed directly in this Realtime session.",
+            `File name: ${attachment.fileName}`,
+            `File type: ${attachment.extension || "unknown"}`,
+            `User instruction: ${instruction}`,
+            attachment.text,
+          ].join("\n"),
+        }],
       },
     });
     this.send({ type: "response.create" });

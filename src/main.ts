@@ -9,6 +9,7 @@ import {
 } from "./avatar-storage";
 import { BackendClient } from "./backend-client";
 import { loadConfig, saveConfig, type AppConfig } from "./config";
+import { formatFileSize } from "./file-processing";
 import { RealtimeClient, type ConnectionState } from "./realtime-client";
 import { ToolRouter } from "./tool-router";
 import { sanitizeAssistantTranscript } from "./transcript";
@@ -31,6 +32,12 @@ const composer = element<HTMLFormElement>("composer");
 const messageInput = element<HTMLTextAreaElement>("message-input");
 const sendButton = element<HTMLButtonElement>("send-button");
 const micButton = element<HTMLButtonElement>("mic-button");
+const attachButton = element<HTMLButtonElement>("attach-button");
+const chatFileInput = element<HTMLInputElement>("chat-file-input");
+const attachmentPreview = element<HTMLDivElement>("attachment-preview");
+const attachmentName = element<HTMLElement>("attachment-name");
+const attachmentMeta = element<HTMLElement>("attachment-meta");
+const removeAttachment = element<HTMLButtonElement>("remove-attachment");
 const settingsDialog = element<HTMLDialogElement>("settings-dialog");
 const settingsForm = element<HTMLFormElement>("settings-form");
 const apiUrlInput = element<HTMLInputElement>("api-url-input");
@@ -49,6 +56,8 @@ let client: RealtimeClient | null = null;
 let muted = false;
 let streamingAssistantMessage: HTMLElement | null = null;
 let hasSavedAvatar = false;
+let pendingFile: File | null = null;
+let sendingFile = false;
 
 function updateStatus(state: ConnectionState, label: string): void {
   statusPill.dataset.state = state;
@@ -61,6 +70,7 @@ function updateStatus(state: ConnectionState, label: string): void {
   messageInput.disabled = !connected;
   sendButton.disabled = !connected;
   micButton.disabled = !connected;
+  attachButton.disabled = !connected;
 }
 
 function scrollMessages(): void {
@@ -79,6 +89,14 @@ function addMessage(role: "user" | "assistant" | "system" | "tool", text: string
   messages.append(article);
   scrollMessages();
   return article;
+}
+
+function setPendingFile(file: File | null): void {
+  pendingFile = file;
+  attachmentPreview.hidden = file === null;
+  attachmentName.textContent = file?.name ?? "";
+  attachmentMeta.textContent = file ? `${formatFileSize(file.size)} · ready to send` : "";
+  if (!file) chatFileInput.value = "";
 }
 
 function updateTranscript(role: "user" | "assistant", text: string, final: boolean): void {
@@ -229,12 +247,53 @@ settingsForm.addEventListener("submit", (event) => {
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = messageInput.value.trim();
-  if (!text || !client?.connected) return;
-  addMessage("user", text);
-  client.sendText(text);
-  messageInput.value = "";
-  messageInput.style.height = "auto";
+  if ((!text && !pendingFile) || !client?.connected || sendingFile) return;
+  if (!pendingFile) {
+    addMessage("user", text);
+    client.sendText(text);
+    messageInput.value = "";
+    messageInput.style.height = "auto";
+    return;
+  }
+
+  const file = pendingFile;
+  void (async () => {
+    sendingFile = true;
+    sendButton.disabled = true;
+    attachButton.disabled = true;
+    removeAttachment.disabled = true;
+    const progressMessage = addMessage("tool", `Preparing ${file.name}…`);
+    const progressText = progressMessage.querySelector("p");
+    addMessage("user", `${text || "Please analyze this file."}\n📎 ${file.name}`);
+    try {
+      await client?.sendFile(file, text, (progress) => {
+        attachmentMeta.textContent = progress;
+        if (progressText) progressText.textContent = progress;
+      });
+      if (progressText) progressText.textContent = `${file.name} sent`;
+      setPendingFile(null);
+      messageInput.value = "";
+      messageInput.style.height = "auto";
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (progressText) progressText.textContent = `Could not send ${file.name}`;
+      attachmentMeta.textContent = detail;
+      addMessage("system", detail);
+    } finally {
+      sendingFile = false;
+      sendButton.disabled = !client?.connected;
+      attachButton.disabled = !client?.connected;
+      removeAttachment.disabled = false;
+    }
+  })();
 });
+
+attachButton.addEventListener("click", () => chatFileInput.click());
+chatFileInput.addEventListener("change", () => {
+  const file = chatFileInput.files?.[0] ?? null;
+  setPendingFile(file);
+});
+removeAttachment.addEventListener("click", () => setPendingFile(null));
 
 messageInput.addEventListener("input", () => {
   messageInput.style.height = "auto";

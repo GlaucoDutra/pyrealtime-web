@@ -10,6 +10,7 @@ A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyre
 - Structured Realtime function-call handling
 - Secure forwarding of application tools to `POST /v1/tools/{tool_name}`
 - Local `get_available_animations` and `play_avatar_animation` tools
+- Chat attachments with image compression and text extraction
 - A smooth antialiased Three.js avatar canvas with optional GLB loading
 - A procedural fallback avatar, embedded gestures, and audio-reactive animation
 - Session-only access-token storage
@@ -82,6 +83,20 @@ The access token is stored only in `sessionStorage`. Do not put a production `AP
 Open settings and either choose a local `.glb` file or enter a public GLB URL. Local files are validated, loaded, and saved in the browser's IndexedDB, so they remain selected after a reload without being uploaded to the backend. The current limit is 50 MB.
 
 Remote URLs are loaded directly by the browser and therefore require CORS permission from the file host. If a remote model is blocked or invalid, the settings dialog remains open and displays the loading error. Use the local file option when a CDN does not provide the required CORS headers.
+
+## Chat attachments
+
+The chat composer accepts one attachment at a time and follows the same processing structure as the original plugin:
+
+- PNG, JPEG, GIF, and WebP images are resized and compressed before being sent as `input_image` content.
+- TXT, Markdown, CSV, JSON, JavaScript, TypeScript, HTML, CSS, and XML are decoded in the browser.
+- PDFs are parsed page-by-page for selectable text.
+- XLSX and XLSM spreadsheets are converted to tab-separated text.
+- Legacy spreadsheets, Word files, PowerPoint files, and unknown formats send a preprocessing notice instead of pretending their contents were read.
+
+Extracted text is capped at 120,000 characters, split into 8,000-character conversation items, and sent with data-channel backpressure. Files are limited to 25 MB. File contents stay in the browser and Realtime session; they are not stored by the PyRealtime backend.
+
+On desktop, the application shell remains fixed to the viewport and only the conversation history scrolls. Mobile layouts retain normal page scrolling while keeping the conversation history independently scrollable.
 
 ## Backend configuration
 
