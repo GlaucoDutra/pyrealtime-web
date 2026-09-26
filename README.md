@@ -2,6 +2,8 @@
 
 A public reference frontend for [PyRealtime](https://github.com/GlaucoDutra/pyrealtime). It demonstrates a complete browser-side OpenAI Realtime integration without exposing a standard OpenAI API key.
 
+For an end-to-end quickstart, configuration and storage reference, WebRTC and tool flows, customization rules, deployment checklist, known limitations, and troubleshooting, read the [complete usage guide](docs/LLM_USAGE.md). It is written as the canonical reference for both humans and coding agents.
+
 ## What it includes
 
 - WebRTC audio sessions created through the PyRealtime backend
