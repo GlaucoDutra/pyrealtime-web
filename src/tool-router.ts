@@ -64,9 +64,25 @@ export const avatarToolSchemas = [
 export class ToolRouter {
   constructor(
     private readonly backend: BackendClient,
-    private readonly avatar: AvatarToolHost,
+    private readonly avatar?: AvatarToolHost,
     private readonly events: ToolRouterEvents = {},
   ) {}
+
+  mergeSchemas(existing: unknown): unknown[] {
+    return mergeToolSchemas(existing, { includeAvatar: this.avatar !== undefined });
+  }
+
+  toolInstructions(): string {
+    const instructions = [
+      "Tools must only be invoked as structured function calls. Never write or speak a function name, arguments, stage direction, or textual imitation of a tool call.",
+    ];
+    if (this.avatar) {
+      instructions.push(
+        "Avatar tools are nonverbal actions. Never announce, describe, or confirm an avatar animation before or after it happens. If the structured call is unavailable, skip the animation rather than describing it.",
+      );
+    }
+    return instructions.join(" ");
+  }
 
   async execute(name: string, argumentsValue: Record<string, unknown>): Promise<ToolExecutionResult> {
     if (name === "navigate_to_url") {
@@ -87,6 +103,7 @@ export class ToolRouter {
     }
 
     if (name === "get_available_animations") {
+      if (!this.avatar) throw new Error("No avatar host is configured");
       const animations = this.avatar.availableAnimations();
       return {
         output: { ok: true, count: animations.length, animation_names: animations },
@@ -95,6 +112,7 @@ export class ToolRouter {
     }
 
     if (name === "play_avatar_animation") {
+      if (!this.avatar) throw new Error("No avatar host is configured");
       const clipName = String(argumentsValue.clip_name ?? "").trim();
       if (!clipName) throw new Error("play_avatar_animation requires clip_name");
       const output = await this.avatar.playAnimation(clipName, {
@@ -124,9 +142,10 @@ export class ToolRouter {
   }
 }
 
-export function mergeToolSchemas(existing: unknown): unknown[] {
+export function mergeToolSchemas(existing: unknown, options: { includeAvatar?: boolean } = {}): unknown[] {
   const merged = Array.isArray(existing) ? [...existing] : [];
-  for (const schema of avatarToolSchemas) {
+  const schemas = options.includeAvatar === false ? avatarToolSchemas.slice(0, 1) : avatarToolSchemas;
+  for (const schema of schemas) {
     const index = merged.findIndex(
       (candidate) =>
         candidate !== null &&

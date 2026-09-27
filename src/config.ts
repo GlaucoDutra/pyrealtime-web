@@ -3,6 +3,7 @@ export interface AppConfig {
   accessToken: string;
   avatarUrl: string;
   microphoneId: string;
+  useMicrophone: boolean;
 }
 
 const CONFIG_KEY = "pyrealtime-web-config";
@@ -28,6 +29,7 @@ export function loadConfig(): AppConfig {
     accessToken: safeSessionValue(TOKEN_KEY),
     avatarUrl: normalizeUrl(saved.avatarUrl || import.meta.env.VITE_AVATAR_MODEL_URL || ""),
     microphoneId: saved.microphoneId || "",
+    useMicrophone: saved.useMicrophone !== false,
   };
 }
 
@@ -67,12 +69,14 @@ export function saveConfig(config: AppConfig): AppConfig {
     accessToken: config.accessToken.trim(),
     avatarUrl: normalizeUrl(config.avatarUrl),
     microphoneId: config.microphoneId.trim(),
+    useMicrophone: config.useMicrophone,
   };
 
   persistCompactConfig(JSON.stringify({
     apiUrl: normalized.apiUrl,
     avatarUrl: normalized.avatarUrl,
     microphoneId: normalized.microphoneId,
+    useMicrophone: normalized.useMicrophone,
   }));
   try {
     if (normalized.accessToken) sessionStorage.setItem(TOKEN_KEY, normalized.accessToken);
@@ -81,6 +85,6 @@ export function saveConfig(config: AppConfig): AppConfig {
   return normalized;
 }
 
-export function authorizationHeaders(accessToken: string): HeadersInit {
+export function authorizationHeaders(accessToken = ""): HeadersInit {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }

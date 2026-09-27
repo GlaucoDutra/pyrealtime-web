@@ -1,4 +1,4 @@
-import { authorizationHeaders, type AppConfig } from "./config";
+import { authorizationHeaders } from "./config";
 import { validateAttachmentSelection, type PreparedAttachment } from "./file-processing";
 
 async function errorMessage(response: Response): Promise<string> {
@@ -12,7 +12,7 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 export class BackendClient {
-  constructor(private readonly config: AppConfig) {}
+  constructor(private readonly config: BackendClientConfig) {}
 
   async createSession(sdpOffer: string, signal?: AbortSignal): Promise<string> {
     const response = await fetch(`${this.config.apiUrl}/v1/realtime/session`, {
@@ -88,4 +88,9 @@ export class BackendClient {
       request.send(file);
     });
   }
+}
+
+export interface BackendClientConfig {
+  apiUrl: string;
+  accessToken?: string;
 }

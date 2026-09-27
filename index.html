@@ -112,6 +112,11 @@
           <input id="access-token-input" name="accessToken" type="password" autocomplete="off" placeholder="User JWT or development API key" />
           <small>Kept only for this browser tab. Never compile a shared secret into a public frontend.</small>
         </label>
+        <label class="checkbox-label">
+          <input id="use-microphone-input" name="useMicrophone" type="checkbox" />
+          <span>Enable microphone and audio replies</span>
+          <small>Turn this off for text-only mode. The browser will not request microphone permission.</small>
+        </label>
         <label>
           Avatar GLB file <span class="optional">recommended</span>
           <input id="avatar-file-input" name="avatarFile" type="file" accept=".glb,model/gltf-binary" />

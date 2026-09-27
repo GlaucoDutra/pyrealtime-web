@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": "dist-client/types",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/client/index.ts",
+    "src/backend-client.ts",
+    "src/config.ts",
+    "src/file-processing.ts",
+    "src/realtime-client.ts",
+    "src/tool-call-accumulator.ts",
+    "src/tool-router.ts"
+  ]
+}

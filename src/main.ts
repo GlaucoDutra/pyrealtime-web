@@ -44,6 +44,7 @@ const settingsDialog = element<HTMLDialogElement>("settings-dialog");
 const settingsForm = element<HTMLFormElement>("settings-form");
 const apiUrlInput = element<HTMLInputElement>("api-url-input");
 const accessTokenInput = element<HTMLInputElement>("access-token-input");
+const useMicrophoneInput = element<HTMLInputElement>("use-microphone-input");
 const avatarUrlInput = element<HTMLInputElement>("avatar-url-input");
 const avatarFileInput = element<HTMLInputElement>("avatar-file-input");
 const avatarFileStatus = element<HTMLElement>("avatar-file-status");
@@ -72,8 +73,8 @@ function updateStatus(state: ConnectionState, label: string): void {
   connectButton.disabled = busy;
   messageInput.disabled = !connected;
   sendButton.disabled = !connected;
-  micButton.disabled = !connected;
-  microphoneSelect.disabled = busy;
+  micButton.disabled = !connected || !config.useMicrophone;
+  microphoneSelect.disabled = busy || !config.useMicrophone;
   attachButton.disabled = !connected;
 }
 
@@ -175,6 +176,11 @@ function createClient(): RealtimeClient {
 }
 
 async function refreshMicrophones(): Promise<boolean> {
+  if (!config.useMicrophone) {
+    microphoneSelect.replaceChildren(new Option("Text-only mode", ""));
+    microphoneSelect.disabled = true;
+    return true;
+  }
   if (!navigator.mediaDevices?.enumerateDevices) {
     microphoneSelect.replaceChildren(new Option("Microphone selection unavailable", ""));
     microphoneSelect.disabled = true;
@@ -201,8 +207,8 @@ async function connect(): Promise<void> {
   }
   client = createClient();
   try {
-    await client.connect(config.microphoneId);
-    client.setMicrophoneMuted(muted);
+    await client.connect({ microphoneDeviceId: config.microphoneId, useMicrophone: config.useMicrophone });
+    if (config.useMicrophone) client.setMicrophoneMuted(muted);
     await refreshMicrophones();
     addMessage("system", "Realtime session connected.");
   } catch {
@@ -232,6 +238,7 @@ async function refreshAvatarFileStatus(): Promise<void> {
 function openSettings(): void {
   apiUrlInput.value = config.apiUrl;
   accessTokenInput.value = config.accessToken;
+  useMicrophoneInput.checked = config.useMicrophone;
   avatarUrlInput.value = config.avatarUrl;
   avatarFileInput.value = "";
   settingsError.hidden = true;
@@ -299,6 +306,7 @@ settingsForm.addEventListener("submit", (event) => {
         accessToken: accessTokenInput.value,
         avatarUrl: file ? "" : remoteUrl,
         microphoneId: config.microphoneId,
+        useMicrophone: useMicrophoneInput.checked,
       };
       config = saveConfig(nextConfig);
       settingsDialog.close();

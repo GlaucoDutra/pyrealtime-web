@@ -20,3 +20,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run pack:check
+      - uses: actions/upload-artifact@v6
+        with:
+          name: browser-client-package
+          path: dist-client/

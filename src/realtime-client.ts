@@ -1,7 +1,7 @@
 import type { BackendClient } from "./backend-client";
 import { MAX_DATA_CHANNEL_BYTES } from "./file-processing";
 import { ToolCallAccumulator, type CompletedToolCall } from "./tool-call-accumulator";
-import { mergeToolSchemas, type ToolRouter } from "./tool-router";
+import type { ToolExecutionResult } from "./tool-router";
 
 export type ConnectionState = "idle" | "connecting" | "connected" | "error";
 
@@ -20,14 +20,20 @@ export interface RealtimeClientEvents {
   onError?: (error: Error) => void;
 }
 
-type RealtimeEvent = Record<string, unknown> & { type?: string };
+export interface RealtimeConnectOptions {
+  microphoneDeviceId?: string;
+  useMicrophone?: boolean;
+}
 
-const TOOL_PROTOCOL = [
-  "Avatar tools are nonverbal actions and must only be invoked as structured function calls.",
-  "Never write or speak a function name, arguments, stage direction, or textual imitation of a tool call.",
-  "Never announce, describe, or confirm an avatar animation before or after it happens.",
-  "If a structured tool call is unavailable, skip the animation rather than describing it.",
-].join(" ");
+export type SessionUpdate = Record<string, unknown>;
+
+export interface RealtimeToolHost {
+  execute(name: string, argumentsValue: Record<string, unknown>): Promise<ToolExecutionResult>;
+  mergeSchemas(existing: unknown): unknown[];
+  toolInstructions(): string;
+}
+
+type RealtimeEvent = Record<string, unknown> & { type?: string };
 
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -46,10 +52,11 @@ export class RealtimeClient {
   private abortController: AbortController | null = null;
   private readonly calls = new ToolCallAccumulator();
   private assistantBuffer = "";
+  private useMicrophone = true;
 
   constructor(
     private readonly backend: BackendClient,
-    private readonly tools: ToolRouter,
+    private readonly tools: RealtimeToolHost,
     private readonly events: RealtimeClientEvents = {},
   ) {}
 
@@ -57,24 +64,29 @@ export class RealtimeClient {
     return this.channel?.readyState === "open";
   }
 
-  async connect(microphoneDeviceId = ""): Promise<void> {
+  async connect(options: RealtimeConnectOptions | string = {}): Promise<void> {
     if (this.peer) await this.disconnect();
+    const normalized = typeof options === "string" ? { microphoneDeviceId: options } : options;
+    const microphoneDeviceId = normalized.microphoneDeviceId ?? "";
+    this.useMicrophone = normalized.useMicrophone !== false;
     this.events.onStatus?.("connecting", "Connecting");
     this.abortController = new AbortController();
     const peer = new RTCPeerConnection();
     this.peer = peer;
 
     try {
-      const microphone = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          ...(microphoneDeviceId ? { deviceId: { exact: microphoneDeviceId } } : {}),
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      this.microphone = microphone;
-      for (const track of microphone.getTracks()) peer.addTrack(track, microphone);
+      if (this.useMicrophone) {
+        const microphone = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            ...(microphoneDeviceId ? { deviceId: { exact: microphoneDeviceId } } : {}),
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        this.microphone = microphone;
+        for (const track of microphone.getTracks()) peer.addTrack(track, microphone);
+      }
 
       peer.ontrack = (event) => {
         const stream = event.streams[0] ?? new MediaStream([event.track]);
@@ -163,6 +175,10 @@ export class RealtimeClient {
       },
     });
     this.send({ type: "response.create" });
+  }
+
+  updateSession(patch: SessionUpdate): void {
+    this.send({ type: "session.update", session: { type: "realtime", ...patch } });
   }
 
   async sendFile(file: File, caption: string, onProgress?: (message: string) => void): Promise<void> {
@@ -308,15 +324,12 @@ export class RealtimeClient {
 
     if (type === "session.created") {
       const session = record(message.session);
-      const instructions = [String(session.instructions ?? "").trim(), TOOL_PROTOCOL].filter(Boolean).join("\n\n");
-      this.send({
-        type: "session.update",
-        session: {
-          type: "realtime",
-          instructions,
-          tools: mergeToolSchemas(session.tools),
-          tool_choice: "auto",
-        },
+      const instructions = [String(session.instructions ?? "").trim(), this.tools.toolInstructions()].filter(Boolean).join("\n\n");
+      this.updateSession({
+        instructions,
+        tools: this.tools.mergeSchemas(session.tools),
+        tool_choice: "auto",
+        ...(!this.useMicrophone ? { output_modalities: ["text"] } : {}),
       });
       return;
     }

@@ -1,22 +1,39 @@
 {
-  "name": "pyrealtime-web",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@glaucodutra/pyrealtime-client",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Reference browser frontend for PyRealtime.",
+  "description": "Reusable browser WebRTC, session, attachment, and tool-call client for PyRealtime, with a reference app.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GlaucoDutra/pyrealtime-web.git"
+  },
+  "files": ["dist-client", "README.md", "LICENSE"],
+  "main": "./dist-client/index.cjs",
+  "module": "./dist-client/index.js",
+  "types": "./dist-client/types/client/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-client/types/client/index.d.ts",
+      "import": "./dist-client/index.js",
+      "require": "./dist-client/index.cjs"
+    }
+  },
+  "publishConfig": { "access": "public" },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run build:client",
+    "build:client": "vite build -c vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "pack:check": "npm pack --dry-run",
     "preview": "vite preview",
     "test": "vitest run"
   },
-  "dependencies": {
-    "three": "^0.180.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^24.5.2",
     "@types/three": "^0.180.0",
     "fake-indexeddb": "^6.2.2",
+    "three": "^0.180.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
     "vitest": "^5.0.1"

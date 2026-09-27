@@ -1,10 +1,10 @@
 # PyRealtime Web complete usage guide
 
-This document is the canonical operating guide for humans and language models that need to run, understand, customize, embed, or troubleshoot the PyRealtime reference frontend.
+This document is the canonical operating guide for humans and language models that need to install, run, understand, customize, embed, or troubleshoot the PyRealtime browser SDK and reference frontend.
 
 ## 1. What this repository is
 
-PyRealtime Web is a public browser reference client for the [PyRealtime Python backend](https://github.com/GlaucoDutra/pyrealtime).
+PyRealtime Web contains the public `@glaucodutra/pyrealtime-client` browser SDK and a reference UI for the [PyRealtime Python backend](https://github.com/GlaucoDutra/pyrealtime).
 
 It demonstrates:
 
@@ -20,7 +20,7 @@ It demonstrates:
 - Generated-image display.
 - Progressive search/tool activity feedback.
 
-It is a reference application, not currently a published npm SDK.
+The package build contains only reusable backend HTTP, WebRTC/session, attachment dispatch, and tool-routing code. The Vite/Three.js UI remains a separate reference application.
 
 ## 2. Architecture boundary
 
@@ -50,7 +50,8 @@ Never move standard OpenAI keys, database credentials, administrative tokens, au
 
 | Path | Purpose |
 | --- | --- |
-| `src/main.ts` | UI wiring and application lifecycle |
+| `src/client/index.ts` | Public npm SDK exports |
+| `src/main.ts` | Reference UI wiring and application lifecycle |
 | `src/backend-client.ts` | HTTP client for PyRealtime endpoints |
 | `src/realtime-client.ts` | WebRTC and Realtime event protocol |
 | `src/tool-router.ts` | Local tool execution and backend forwarding |
@@ -63,6 +64,31 @@ Never move standard OpenAI keys, database credentials, administrative tokens, au
 | `index.html` | Application markup |
 
 Follow `ARCHITECTURE.md` before deciding where a new feature belongs.
+
+### SDK installation and minimal use
+
+```bash
+npm install --save-exact https://github.com/GlaucoDutra/pyrealtime-web/releases/download/v0.2.0/glaucodutra-pyrealtime-client-0.2.0.tgz
+```
+
+After npm trusted publishing is enabled, use `npm install --save-exact @glaucodutra/pyrealtime-client@0.2.0`.
+
+```ts
+import { BackendClient, RealtimeClient, ToolRouter } from "@glaucodutra/pyrealtime-client";
+
+const backend = new BackendClient({ apiUrl: "https://api.example.com", accessToken: userJwt });
+const tools = new ToolRouter(backend);
+const client = new RealtimeClient(backend, tools, {
+  onTranscript: (role, text, final) => updateYourUI(role, text, final),
+  onTool: (activity) => updateToolProgress(activity),
+  onError: (error) => reportError(error),
+});
+
+await client.connect({ useMicrophone: false });
+client.sendText("Hello");
+```
+
+Use `new ToolRouter(backend, avatarHost)` only when the host app has an avatar. Without an avatar host, avatar schemas and avatar-specific instructions are not added.
 
 ## 4. Fastest Windows setup
 
@@ -97,7 +123,7 @@ Follow the backend repository's `docs/LLM_USAGE.md`. A minimal PowerShell run is
 cd ..\pyrealtime
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[api,files]"
+python -m pip install "pyrealtime-ai[api,auth,files] @ https://github.com/GlaucoDutra/pyrealtime/releases/download/v0.2.0/pyrealtime_ai-0.2.0-py3-none-any.whl"
 $env:OPENAI_API_KEY = "sk-your-server-key"
 $env:APP_API_KEY = "local-development-token"
 $env:APP_CORS_ORIGINS = "http://127.0.0.1:5173"
@@ -146,12 +172,13 @@ The settings dialog accepts:
 
 - PyRealtime API URL.
 - Application access token or user JWT.
+- Audio/microphone enablement; disable it for text-only mode.
 - Local GLB file.
 - Remote GLB URL.
 
 Storage behavior:
 
-- API URL, avatar URL, and microphone ID are persisted in browser storage.
+- API URL, avatar URL, microphone mode, and microphone ID are persisted in browser storage.
 - The access token is stored only in `sessionStorage` and disappears when that browser tab/session ends.
 - A selected local GLB is stored in IndexedDB and is never uploaded to PyRealtime.
 - Local GLBs are limited to 50 MB.
@@ -162,15 +189,14 @@ The frontend access token authenticates to your application backend. It is not t
 
 The reference client uses PyRealtime's unified WebRTC session endpoint:
 
-1. Request microphone access with echo cancellation, noise suppression, and automatic gain control.
-2. Create `RTCPeerConnection`.
-3. Add the selected microphone track.
-4. Create the `oai-events` data channel.
-5. Create and set the local SDP offer.
-6. POST the SDP body to `POST /v1/realtime/session`.
-7. Set the returned SDP answer as the remote description.
-8. Wait for the data channel to open.
-9. Attach the remote OpenAI audio stream to an autoplay audio element and avatar analyser.
+1. Create `RTCPeerConnection`.
+2. In audio mode only, request microphone access with echo cancellation, noise suppression, and automatic gain control, then add the selected track.
+3. Create the `oai-events` data channel.
+4. Create and set the local SDP offer.
+5. POST the SDP body to `POST /v1/realtime/session`.
+6. Set the returned SDP answer as the remote description.
+7. Wait for the data channel to open.
+8. In audio mode, attach the remote OpenAI stream to an autoplay audio element and avatar analyser. In text-only mode, send `session.update` with `output_modalities: ["text"]` and do not call `getUserMedia`.
 
 The standard OpenAI key never reaches the browser. The unified WebRTC architecture follows the official [OpenAI WebRTC guide](https://developers.openai.com/api/docs/guides/voice-webrtc).
 
@@ -312,7 +338,7 @@ Known avatar limitations:
 - The mic button enables or disables the local audio track.
 - Device changes refresh the selector.
 
-Current limitation: connection always requests microphone permission. A text-only connection mode is not yet implemented.
+Text-only mode is selected in settings or with `connect({ useMicrophone: false })`; it never requests microphone permission. Use `connect({ useMicrophone: true, microphoneDeviceId })` for audio.
 
 ## 17. Transcript behavior
 
@@ -346,6 +372,8 @@ Put it in this frontend when it involves:
 - File pickers and upload progress.
 - Browser navigation or another device-local effect.
 
+Within this repository, put reusable WebRTC/session/tool behavior in the SDK modules exported by `src/client/index.ts`; keep DOM, Three.js, and visual state in the reference app.
+
 Cheap validation may exist in both places for immediate UX, but the server remains authoritative.
 
 ## 19. Production deployment checklist
@@ -362,7 +390,7 @@ Cheap validation may exist in both places for immediate UX, but the server remai
 - Add a Content Security Policy suitable for the chosen deployment and asset hosts.
 - Preserve clickable web-search citations.
 - Run `npm test` and `npm run build`.
-- Select a repository license before inviting third-party reuse.
+- Review the MIT license and compatibility policy.
 
 ## 20. Troubleshooting
 
@@ -380,7 +408,7 @@ The launcher only stops a listener it can identify as belonging to this project.
 
 ### Microphone permission denied
 
-Grant microphone permission for the frontend origin and reconnect. Text-only connection is not currently available.
+Grant microphone permission for the frontend origin and reconnect, or disable **Enable microphone and audio replies** to use text-only mode without permission.
 
 ### Microphone list has no names
 
@@ -408,6 +436,8 @@ Set backend `PYREALTIME_VECTOR_STORE_IDS`, restart the backend, then reconnect s
 npm install
 npm test
 npm run build
+npm run build:client
+npm run pack:check
 npm run dev
 npm run preview
 ```
@@ -421,13 +451,12 @@ An LLM making changes must:
 5. Run `npm test` and `npm run build`.
 6. Update this guide when public UI behavior, configuration, tool flow, storage, or setup changes.
 
-## 22. Known limitations
+## 22. Known limitations and product boundaries
 
-- This project is a reference application, not a published npm library.
-- It currently requires microphone permission to connect.
+- The SDK release workflow creates a GitHub package artifact. npm publication begins after the owner enables trusted publishing and `NPM_PUBLISH_ENABLED`.
 - It does not expose assistant-audio mute separately from microphone mute.
-- It does not expose runtime model, voice, VAD, or instruction controls.
+- `updateSession()` exposes runtime session updates, but OpenAI does not permit changing the voice after audio has already been emitted.
 - It does not expose response usage or cost accounting.
-- Local frontend tool registration is not yet a public extension API.
-- The repository does not currently declare a reuse license.
+- Pricing/accounting belongs to the backend `UsageSink`; the client currently does not surface response usage.
+- The reference UI is not shipped in the npm package. Consumers own their DOM, styling, state, and optional avatar implementation.
 
